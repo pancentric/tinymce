@@ -1,5 +1,6 @@
 Version 4.2.8 (2015-xx-xx)
 	Fixed bug where it was possible to delete tables as the inline root element if all columns where selected.
+	Changed the image plugin to include a reset size button, and if width/height not set, the img wont have them.
 Version 4.2.7 (2015-10-27)
 	Fixed bug where backspace/delete would remove all formats on the last paragraph character in WebKit/Blink.
 	Fixed bug where backspace within a inline format element with a bogus caret container would move the caret.

@@ -53,7 +53,8 @@
 			"constrain": true,
 			"height": "",
 			"src": "",
-			"width": ""
+			"width": "",
+			"revert": ""
 		});
 
 		fillAndSubmitWindowForm({
@@ -110,7 +111,8 @@
 			"constrain": true,
 			"height": "",
 			"src": "",
-			"width": ""
+			"width": "",
+			"revert": ""
 		});
 
 		fillAndSubmitWindowForm({

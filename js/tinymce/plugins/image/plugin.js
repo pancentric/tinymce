@@ -131,9 +131,14 @@ tinymce.PluginManager.add('image', function(editor) {
 				}
 
 				imgElm.onload = function() {
-					if (!data.width && !data.height && imageDimensions) {
+					if (data.width) {
 						dom.setAttribs(imgElm, {
-							width: imgElm.clientWidth,
+							width: imgElm.clientWidth
+						});
+					}
+
+					if (data.height) {
+						dom.setAttribs(imgElm, {
 							height: imgElm.clientHeight
 						});
 					}
@@ -145,7 +150,7 @@ tinymce.PluginManager.add('image', function(editor) {
 			}
 
 			updateStyle();
-			recalcSize();
+			// recalcSize();
 
 			data = tinymce.extend(data, win.toJSON());
 
@@ -254,6 +259,18 @@ tinymce.PluginManager.add('image', function(editor) {
 			}
 		}
 
+		function resetImageSize() {
+			getImageSize(data.src, function(data) {
+				if (data.width && data.height && imageDimensions) {
+					width = data.width;
+					height = data.height;
+
+					win.find('#width').value(width);
+					win.find('#height').value(height);
+				}
+			});
+		}
+
 		width = dom.getAttrib(imgElm, 'width');
 		height = dom.getAttrib(imgElm, 'height');
 
@@ -350,6 +367,18 @@ tinymce.PluginManager.add('image', function(editor) {
 					{type: 'label', text: 'x'},
 					{name: 'height', type: 'textbox', maxLength: 5, size: 3, onchange: recalcSize, ariaLabel: 'Height'},
 					{name: 'constrain', type: 'checkbox', checked: true, text: 'Constrain proportions'}
+				]
+			});
+
+			generalFormItems.push({
+				type: 'container',
+				label: ' ',
+				layout: 'flex',
+				direction: 'row',
+				align: 'center',
+				spacing: 5,
+				items: [
+					{name: 'revert', type: 'button', text: 'Reset image size', onclick: resetImageSize}
 				]
 			});
 		}
