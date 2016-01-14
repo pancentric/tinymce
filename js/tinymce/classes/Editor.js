@@ -58,19 +58,24 @@ define("tinymce/Editor", [
 	"tinymce/dom/ScriptLoader",
 	"tinymce/dom/EventUtils",
 	"tinymce/WindowManager",
+	"tinymce/NotificationManager",
 	"tinymce/html/Schema",
 	"tinymce/html/DomParser",
 	"tinymce/util/Quirks",
 	"tinymce/Env",
 	"tinymce/util/Tools",
+	"tinymce/util/Delay",
 	"tinymce/EditorObservable",
+	"tinymce/Mode",
 	"tinymce/Shortcuts",
-	"tinymce/EditorUpload"
+	"tinymce/EditorUpload",
+	"tinymce/SelectionOverrides"
 ], function(
 	DOMUtils, DomQuery, AddOnManager, NodeChange, Node, DomSerializer, Serializer,
 	Selection, Formatter, UndoManager, EnterKey, ForceBlocks, EditorCommands,
-	URI, ScriptLoader, EventUtils, WindowManager,
-	Schema, DomParser, Quirks, Env, Tools, EditorObservable, Shortcuts, EditorUpload
+	URI, ScriptLoader, EventUtils, WindowManager, NotificationManager,
+	Schema, DomParser, Quirks, Env, Tools, Delay, EditorObservable, Mode, Shortcuts, EditorUpload,
+	SelectionOverrides
 ) {
 	// Shorten these names
 	var DOM = DOMUtils.DOM, ThemeManager = AddOnManager.ThemeManager, PluginManager = AddOnManager.PluginManager;
@@ -139,9 +144,9 @@ define("tinymce/Editor", [
 			convert_fonts_to_spans: true,
 			indent: 'simple',
 			indent_before: 'p,h1,h2,h3,h4,h5,h6,blockquote,div,title,style,pre,script,td,th,ul,ol,li,dl,dt,dd,area,table,thead,' +
-				'tfoot,tbody,tr,section,article,hgroup,aside,figure,option,optgroup,datalist',
+				'tfoot,tbody,tr,section,article,hgroup,aside,figure,figcaption,option,optgroup,datalist',
 			indent_after: 'p,h1,h2,h3,h4,h5,h6,blockquote,div,title,style,pre,script,td,th,ul,ol,li,dl,dt,dd,area,table,thead,' +
-				'tfoot,tbody,tr,section,article,hgroup,aside,figure,option,optgroup,datalist',
+				'tfoot,tbody,tr,section,article,hgroup,aside,figure,figcaption,option,optgroup,datalist',
 			validate: true,
 			entity_encoding: 'named',
 			url_converter: self.convertURL,
@@ -167,17 +172,9 @@ define("tinymce/Editor", [
 		 *
 		 * @property isNotDirty
 		 * @type Boolean
-		 * @example
-		 * function ajaxSave() {
-		 *     var ed = tinymce.get('elm1');
-		 *
-		 *     // Save contents using some XHR call
-		 *     alert(ed.getContent());
-		 *
-		 *     ed.isNotDirty = true; // Force not dirty state
-		 * }
+		 * @deprecated Use editor.setDirty instead.
 		 */
-		self.isNotDirty = true;
+		self.setDirty(false);
 
 		/**
 		 * Name/Value object containing plugin instances.
@@ -343,7 +340,7 @@ define("tinymce/Editor", [
 					form._mceOldSubmit = form.submit;
 					form.submit = function() {
 						self.editorManager.triggerSave();
-						self.isNotDirty = true;
+						self.setDirty(false);
 
 						return form._mceOldSubmit(form);
 					};
@@ -370,6 +367,17 @@ define("tinymce/Editor", [
 			 * });
 			 */
 			self.windowManager = new WindowManager(self);
+
+			/**
+			 * Notification manager reference, use this to open new windows and dialogs.
+			 *
+			 * @property notificationManager
+			 * @type tinymce.NotificationManager
+			 * @example
+			 * // Shows a notification info message.
+			 * tinymce.activeEditor.notificationManager.open({text: 'Hello world!', type: 'info'});
+			 */
+			self.notificationManager = new NotificationManager(self);
 
 			if (settings.encoding == 'xml') {
 				self.on('GetContent', function(e) {
@@ -519,6 +527,10 @@ define("tinymce/Editor", [
 					each(PluginManager.dependencies(plugin), function(dep) {
 						initPlugin(dep);
 					});
+
+					if (self.plugins[plugin]) {
+						return;
+					}
 
 					pluginInstance = new Plugin(self, pluginUrl, self.$);
 
@@ -767,8 +779,9 @@ define("tinymce/Editor", [
 			// It will not steal focus while setting contentEditable
 			body = self.getBody();
 			body.disabled = true;
+			self.readonly = settings.readonly;
 
-			if (!settings.readonly) {
+			if (!self.readonly) {
 				if (self.inline && DOM.getStyle(body, 'position', true) == 'static') {
 					body.style.position = 'relative';
 				}
@@ -941,6 +954,7 @@ define("tinymce/Editor", [
 			self.forceBlocks = new ForceBlocks(self);
 			self.enterKey = new EnterKey(self);
 			self._nodeChangeDispatcher = new NodeChange(self);
+			self._selectionOverrides = new SelectionOverrides(self);
 
 			self.fire('PreInit');
 
@@ -1024,7 +1038,7 @@ define("tinymce/Editor", [
 
 			// Handle auto focus
 			if (settings.auto_focus) {
-				setTimeout(function() {
+				Delay.setEditorTimeout(self, function() {
 					var editor;
 
 					if (settings.auto_focus === true) {
@@ -1052,7 +1066,13 @@ define("tinymce/Editor", [
 		 */
 		focus: function(skipFocus) {
 			var self = this, selection = self.selection, contentEditable = self.settings.content_editable, rng;
-			var controlElm, doc = self.getDoc(), body;
+			var controlElm, doc = self.getDoc(), body = self.getBody(), contentEditableHost;
+
+			function getContentEditableHost(node) {
+				return self.dom.getParent(node, function(node) {
+					return self.dom.getContentEditable(node) === "true";
+				});
+			}
 
 			if (!skipFocus) {
 				// Get selected control element
@@ -1062,6 +1082,15 @@ define("tinymce/Editor", [
 				}
 
 				self._refreshContentEditable();
+
+				// Move focus to contentEditable=true child if needed
+				contentEditableHost = getContentEditableHost(selection.getNode());
+				if (self.$.contains(body, contentEditableHost)) {
+					contentEditableHost.focus();
+					selection.normalize();
+					self.editorManager.setActive(self);
+					return;
+				}
 
 				// Focus the window iframe
 				if (!contentEditable) {
@@ -1076,8 +1105,6 @@ define("tinymce/Editor", [
 
 				// Focus the body as well since it's contentEditable
 				if (isGecko || contentEditable) {
-					body = self.getBody();
-
 					// Check for setActive since it doesn't scroll to the element
 					if (body.setActive) {
 						// IE 11 sometimes throws "Invalid function" then fallback to focus
@@ -1639,7 +1666,7 @@ define("tinymce/Editor", [
 			args.element = elm = null;
 
 			if (args.set_dirty !== false) {
-				self.isNotDirty = true;
+				self.setDirty(false);
 			}
 
 			return html;
@@ -1772,7 +1799,7 @@ define("tinymce/Editor", [
 
 			// Get raw contents or by default the cleaned contents
 			if (args.format == 'raw') {
-				content = body.innerHTML;
+				content = self.serializer.getTrimmedContent();
 			} else if (args.format == 'text') {
 				content = body.innerText || body.textContent;
 			} else {
@@ -1812,6 +1839,10 @@ define("tinymce/Editor", [
 		/**
 		 * Returns true/false if the editor is dirty or not. It will get dirty if the user has made modifications to the contents.
 		 *
+		 * The dirty state is automatically set to true if you do modifications to the content in other
+		 * words when new undo levels is created or if you undo/redo to update the contents of the editor. It will also be set
+		 * to false if you call editor.save().
+		 *
 		 * @method isDirty
 		 * @return {Boolean} True/false if the editor is dirty or not. It will get dirty if the user has made modifications to the contents.
 		 * @example
@@ -1820,6 +1851,42 @@ define("tinymce/Editor", [
 		 */
 		isDirty: function() {
 			return !this.isNotDirty;
+		},
+
+		/**
+		 * Explicitly sets the dirty state. This will fire the dirty event if the editor dirty state is changed from false to true
+		 * by invoking this method.
+		 *
+		 * @method setDirty
+		 * @param {Boolean} state True/false if the editor is considered dirty.
+		 * @example
+		 * function ajaxSave() {
+		 *     var editor = tinymce.get('elm1');
+		 *
+		 *     // Save contents using some XHR call
+		 *     alert(editor.getContent());
+		 *
+		 *     editor.setDirty(false); // Force not dirty state
+		 * }
+		 */
+		setDirty: function(state) {
+			var oldState = !this.isNotDirty;
+
+			this.isNotDirty = !state;
+
+			if (state && state != oldState) {
+				this.fire('dirty');
+			}
+		},
+
+		/**
+		 * Sets the editor mode. Mode can be for example "design", "code" or "readonly".
+		 *
+		 * @method setMode
+		 * @param {String} mode Mode to set the editor in.
+		 */
+		setMode: function(mode) {
+			Mode.setMode(this, mode);
 		},
 
 		/**
@@ -2033,6 +2100,7 @@ define("tinymce/Editor", [
 
 				self.editorManager.remove(self);
 				DOM.remove(self.getContainer());
+				self._selectionOverrides.destroy();
 				self.editorUpload.destroy();
 				self.destroy();
 			}
@@ -2115,7 +2183,7 @@ define("tinymce/Editor", [
 		_refreshContentEditable: function() {
 			var self = this, body, parent;
 
-			// Check if the editor was hidden and the re-initalize contentEditable mode by removing and adding the body again
+			// Check if the editor was hidden and the re-initialize contentEditable mode by removing and adding the body again
 			if (self._isHidden()) {
 				body = self.getBody();
 				parent = body.parentNode;

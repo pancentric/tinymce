@@ -176,7 +176,7 @@ define("tinymce/tableplugin/TableGrid", [
 
 					// Add something to the inner node
 					if (curNode) {
-						curNode.innerHTML = Env.ie ? '&nbsp;' : '<br data-mce-bogus="1" />';
+						curNode.innerHTML = Env.ie && Env.ie < 10 ? '&nbsp;' : '<br data-mce-bogus="1" />';
 					}
 
 					return false;
@@ -367,7 +367,7 @@ define("tinymce/tableplugin/TableGrid", [
 								children = Tools.grep(startCell.childNodes);
 								count = 0;
 								each(children, function(node) {
-									if (node.nodeName == 'BR' && dom.getAttrib(node, 'data-mce-bogus') && count++ < children.length - 1) {
+									if (node.nodeName == 'BR' && count++ < children.length - 1) {
 										startCell.removeChild(node);
 									}
 								});
@@ -777,7 +777,7 @@ define("tinymce/tableplugin/TableGrid", [
 				endX = Math.max(startPos.x, endPos.x);
 				endY = Math.max(startPos.y, endPos.y);
 
-				// Expand end positon to include spans
+				// Expand end position to include spans
 				maxX = endX;
 				maxY = endY;
 

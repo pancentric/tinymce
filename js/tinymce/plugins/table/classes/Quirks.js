@@ -16,10 +16,11 @@
  */
 define("tinymce/tableplugin/Quirks", [
 	"tinymce/util/VK",
+	"tinymce/util/Delay",
 	"tinymce/Env",
 	"tinymce/util/Tools",
 	"tinymce/tableplugin/Utils"
-], function(VK, Env, Tools, Utils) {
+], function(VK, Delay, Env, Tools, Utils) {
 	var each = Tools.each, getSpanVal = Utils.getSpanVal;
 
 	return function(editor) {
@@ -168,7 +169,7 @@ define("tinymce/tableplugin/Quirks", [
 
 				if (isVerticalMovement() && isInTable(editor)) {
 					var preBrowserNode = editor.selection.getNode();
-					setTimeout(function() {
+					Delay.setEditorTimeout(editor, function() {
 						if (shouldFixCaret(preBrowserNode)) {
 							handle(!e.shiftKey && key === VK.UP, preBrowserNode, e);
 						}
@@ -246,7 +247,7 @@ define("tinymce/tableplugin/Quirks", [
 							editor.getBody(),
 							editor.settings.forced_root_block,
 							editor.settings.forced_root_block_attrs,
-							Env.ie && Env.ie < 11 ? '&nbsp;' : '<br data-mce-bogus="1" />'
+							Env.ie && Env.ie < 10 ? '&nbsp;' : '<br data-mce-bogus="1" />'
 						);
 					} else {
 						editor.dom.add(editor.getBody(), 'br', {'data-mce-bogus': '1'});
@@ -391,7 +392,7 @@ define("tinymce/tableplugin/Quirks", [
 			fixTableCaretPos();
 		}
 
-		if (Env.ie > 10) {
+		if (Env.ie > 9) {
 			fixBeforeTableCaretBug();
 			fixTableCaretPos();
 		}

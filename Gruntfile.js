@@ -22,7 +22,9 @@ module.exports = function(grunt) {
 				"!js/tinymce/plugins/paste/plugin.js",
 				"!js/tinymce/plugins/table/plugin.js",
 				"!js/tinymce/plugins/spellchecker/plugin.js",
-				"!js/tinymce/plugins/imagetools/plugin.js"
+				"!js/tinymce/plugins/imagetools/plugin.js",
+				"!js/tinymce/plugins/codesample/plugin.js",
+				"!js/tinymce/plugins/codesample/classes/Prism.js"
 			],
 
 			themes: ["js/tinymce/themes/*/theme.js"]
@@ -41,7 +43,9 @@ module.exports = function(grunt) {
 				"!js/tinymce/plugins/paste/plugin.js",
 				"!js/tinymce/plugins/table/plugin.js",
 				"!js/tinymce/plugins/spellchecker/plugin.js",
-				"!js/tinymce/plugins/imagetools/plugin.js"
+				"!js/tinymce/plugins/imagetools/plugin.js",
+				"!js/tinymce/plugins/codesample/plugin.js",
+				"!js/tinymce/plugins/codesample/classes/Prism.js"
 			],
 
 			themes: ["js/tinymce/themes/*/theme.js"]
@@ -72,6 +76,7 @@ module.exports = function(grunt) {
 					compress: true,
 
 					from: [
+						"geom/Rect.js",
 						"dom/DomQuery.js",
 						"EditorManager.js",
 						"LegacyInput.js",
@@ -102,6 +107,7 @@ module.exports = function(grunt) {
 					compress: true,
 
 					from: [
+						"geom/Rect.js",
 						"dom/DomQuery.js",
 						"EditorManager.js",
 						"LegacyInput.js",
@@ -173,6 +179,21 @@ module.exports = function(grunt) {
 
 					from: "Plugin.js"
 				}
+			},
+
+			"codesample-plugin": {
+				options: {
+					baseDir: "js/tinymce/plugins/codesample/classes",
+					rootNS: "tinymce.codesampleplugin",
+					outputSource: "js/tinymce/plugins/codesample/plugin.js",
+					outputMinified: "js/tinymce/plugins/codesample/plugin.min.js",
+					outputDev: "js/tinymce/plugins/codesample/plugin.dev.js",
+					verbose: false,
+					expose: "public",
+					compress: true,
+
+					from: "Plugin.js"
+				}
 			}
 		},
 
@@ -220,7 +241,8 @@ module.exports = function(grunt) {
 			modern: {
 				options: {
 					cleancss: true,
-					strictImports: true
+					strictImports: true,
+					compress: true
 				},
 
 				expand: true,
@@ -243,7 +265,8 @@ module.exports = function(grunt) {
 			content: {
 				options: {
 					cleancss: true,
-					strictImports: true
+					strictImports: true,
+					compress: true
 				},
 
 				rename: function(dest, src) {
@@ -258,7 +281,8 @@ module.exports = function(grunt) {
 			"content-inline": {
 				options: {
 					cleancss: true,
-					strictImports: true
+					strictImports: true,
+					compress: true
 				},
 
 				rename: function(dest, src) {
@@ -351,10 +375,12 @@ module.exports = function(grunt) {
 						"readme.md"
 					],
 
-					pathFilter: function(args) {
-						if (args.zipFilePath == "js/tinymce/tinymce.jquery.min.js") {
-							args.zipFilePath = "js/tinymce/tinymce.min.js";
+					pathFilter: function(zipFilePath) {
+						if (zipFilePath == "js/tinymce/tinymce.jquery.min.js") {
+							return "js/tinymce/tinymce.min.js";
 						}
+
+						return zipFilePath;
 					},
 
 					to: "tmp/tinymce_<%= pkg.version %>_jquery.zip"
@@ -402,6 +428,65 @@ module.exports = function(grunt) {
 				]
 			},
 
+			cdn: {
+				options: {
+					onBeforeSave: function(zip) {
+						zip.addData("dist/version.txt", packageData.version);
+					},
+
+					pathFilter: function(zipFilePath) {
+						return zipFilePath.replace('js/tinymce/', 'dist/');
+					},
+
+					excludes: [
+						"js/tinymce/tinymce.full.min.js",
+						"js/tinymce/plugins/moxiemanager",
+						"js/tinymce/plugins/visualblocks/img",
+						"js/tinymce/plugins/*/plugin.dev.js",
+						"js/tinymce/skins/*/*.less",
+						"js/tinymce/skins/*/fonts/*.json",
+						"js/tinymce/skins/*/fonts/*.dev.svg",
+						"js/tinymce/skins/*/fonts/readme.md",
+						"js/tinymce/plugins/*/config",
+						"js/tinymce/plugins/*/scratch",
+						"js/tinymce/plugins/*/classes",
+						"readme.md",
+						"js/tests/.jshintrc"
+					],
+
+					concat: [
+						{
+							src: [
+								"js/tinymce/tinymce.min.js",
+								"js/tinymce/themes/*/theme.min.js",
+								"js/tinymce/plugins/*/plugin.min.js",
+								"!js/tinymce/plugins/compat3x/plugin.min.js",
+								"!js/tinymce/plugins/example/plugin.min.js",
+								"!js/tinymce/plugins/example_dependency/plugin.min.js",
+								"!js/tinymce/plugins/layer/plugin.min.js"
+							],
+
+							dest: [
+								"js/tinymce/tinymce.min.js",
+								"js/tinymce/tinymce.jquery.min.js"
+							]
+						}
+					],
+
+					to: "tmp/tinymce_<%= pkg.version %>_cdn.zip"
+				},
+
+				src: [
+					"js/tinymce/jquery.tinymce.min.js",
+					"js/tinymce/tinymce.js",
+					"js/tinymce/langs",
+					"js/tinymce/plugins",
+					"js/tinymce/skins",
+					"js/tinymce/themes",
+					"js/tinymce/license.txt"
+				]
+			},
+
 			component: {
 				options: {
 					excludes: [
@@ -419,10 +504,12 @@ module.exports = function(grunt) {
 						"readme.md"
 					],
 
-					pathFilter: function(args) {
-						if (args.zipFilePath.indexOf("js/tinymce/") === 0) {
-							args.zipFilePath = args.zipFilePath.substr("js/tinymce/".length);
+					pathFilter: function(zipFilePath) {
+						if (zipFilePath.indexOf("js/tinymce/") === 0) {
+							return zipFilePath.substr("js/tinymce/".length);
 						}
+
+						return zipFilePath;
 					},
 
 					onBeforeSave: function(zip) {
@@ -432,12 +519,10 @@ module.exports = function(grunt) {
 
 						zip.addData("bower.json", jsonToBuffer({
 							"name": "tinymce",
-							"version": packageData.version,
 							"description": "Web based JavaScript HTML WYSIWYG editor control.",
-							"license": "http://www.tinymce.com/license",
+							"license": "LGPL-2.1",
 							"keywords": ["editor", "wysiwyg", "tinymce", "richtext", "javascript", "html"],
 							"homepage": "http://www.tinymce.com",
-							"main": "tinymce.min.js",
 							"ignore": ["readme.md", "composer.json", "package.json"]
 						}));
 
@@ -681,7 +766,7 @@ module.exports = function(grunt) {
 			plugins: {
 				files: ["js/tinymce/plugins/**/*.js"],
 				tasks: [
-					"amdlc:paste-plugin", "amdlc:imagetools-plugin",
+					"amdlc:paste-plugin", "amdlc:imagetools-plugin", "amdlc:codesample-plugin",
 					"amdlc:table-plugin", "amdlc:spellchecker-plugin", "uglify:plugins",
 					"eslint:plugins", "jscs:plugins"
 				],
