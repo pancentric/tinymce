@@ -298,7 +298,9 @@ tinymce.PluginManager.add('image', function(editor) {
 		}
 
 		function resetImageSize() {
-			getImageSize(data.src, function(data) {
+			var sImg = data.src;
+			sImg = ((sImg.indexOf("?") == -1) ? sImg + "?rnd=" : "&rnd=") + new Date().getTime();
+			getImageSize(sImg, function(data) {
 				if (data.width && data.height && imageDimensions) {
 					width = data.width;
 					height = data.height;
