@@ -20,7 +20,7 @@ define("tinymce/tableplugin/CellSelection", [
 	"tinymce/dom/TreeWalker",
 	"tinymce/util/Tools"
 ], function(TableGrid, TreeWalker, Tools) {
-	return function(editor) {
+	return function(editor, selectionChange) {
 		var dom = editor.dom, tableGrid, startCell, startTable, lastMouseOverTarget, hasCellSelection = true, resizing;
 
 		function clear(force) {
@@ -28,14 +28,15 @@ define("tinymce/tableplugin/CellSelection", [
 			editor.getBody().style.webkitUserSelect = '';
 
 			if (force || hasCellSelection) {
-				editor.dom.removeClass(
-					editor.dom.select('td.mce-item-selected,th.mce-item-selected'),
-					'mce-item-selected'
-				);
-
+				editor.$('td[data-mce-selected],th[data-mce-selected]').removeAttr('data-mce-selected');
 				hasCellSelection = false;
 			}
 		}
+
+		var endSelection = function () {
+			startCell = tableGrid = startTable = lastMouseOverTarget = null;
+			selectionChange(false);
+		};
 
 		function isCellInTable(table, cell) {
 			if (!table || !cell) {
@@ -65,6 +66,13 @@ define("tinymce/tableplugin/CellSelection", [
 				if (!isCellInTable(startTable, currentCell)) {
 					currentCell = dom.getParent(startTable, 'td,th');
 				}
+
+				// Selection inside first cell is normal until we have expanted
+				if (startCell === currentCell && !hasCellSelection) {
+					return;
+				}
+
+				selectionChange(true);
 
 				if (isCellInTable(startTable, currentCell)) {
 					e.preventDefault();
@@ -154,7 +162,7 @@ define("tinymce/tableplugin/CellSelection", [
 				}
 
 				// Try to expand text selection as much as we can only Gecko supports cell selection
-				selectedCells = dom.select('td.mce-item-selected,th.mce-item-selected');
+				selectedCells = dom.select('td[data-mce-selected],th[data-mce-selected]');
 				if (selectedCells.length > 0) {
 					rng = dom.createRng();
 					node = selectedCells[0];
@@ -166,7 +174,7 @@ define("tinymce/tableplugin/CellSelection", [
 
 					do {
 						if (node.nodeName == 'TD' || node.nodeName == 'TH') {
-							if (!dom.hasClass(node, 'mce-item-selected')) {
+							if (!dom.getAttrib(node, 'data-mce-selected')) {
 								break;
 							}
 
@@ -180,13 +188,13 @@ define("tinymce/tableplugin/CellSelection", [
 				}
 
 				editor.nodeChanged();
-				startCell = tableGrid = startTable = lastMouseOverTarget = null;
+				endSelection();
 			}
 		});
 
 		editor.on('KeyUp Drop SetContent', function(e) {
 			clear(e.type == 'setcontent');
-			startCell = tableGrid = startTable = lastMouseOverTarget = null;
+			endSelection();
 			resizing = false;
 		});
 

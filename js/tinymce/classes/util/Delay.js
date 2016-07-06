@@ -46,7 +46,7 @@ define("tinymce/util/Delay", [
 
 	function wrappedSetInterval(callback, time) {
 		if (typeof time != 'number') {
-			time = 0;
+			time = 1; // IE 8 needs it to be > 0
 		}
 
 		return setInterval(callback, time);
@@ -153,9 +153,9 @@ define("tinymce/util/Delay", [
 		 * @return {Function} Throttled function callback.
 		 */
 		throttle: function(callback, time) {
-			var timer;
+			var timer, func;
 
-			return function() {
+			func = function() {
 				var args = arguments;
 
 				clearTimeout(timer);
@@ -164,6 +164,12 @@ define("tinymce/util/Delay", [
 					callback.apply(this, args);
 				}, time);
 			};
+
+			func.stop = function() {
+				clearTimeout(timer);
+			};
+
+			return func;
 		},
 
 		/**

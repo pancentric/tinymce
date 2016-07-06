@@ -64,6 +64,18 @@ define("tinymce/tableplugin/Plugin", [
 				tableElm = editor.dom.get('__mce');
 				editor.dom.setAttrib(tableElm, 'id', null);
 
+				editor.$('tr', tableElm).each(function(index, row) {
+					editor.fire('newrow', {
+						node: row
+					});
+
+					editor.$('th,td', row).each(function(index, cell) {
+						editor.fire('newcell', {
+							node: cell
+						});
+					});
+				});
+
 				editor.dom.setAttribs(tableElm, editor.settings.table_default_attributes || {});
 				editor.dom.setStyles(tableElm, editor.settings.table_default_styles || {});
 			});
@@ -75,7 +87,7 @@ define("tinymce/tableplugin/Plugin", [
 			function bindStateListener() {
 				var selectedElm, selectedCells, parts = {}, sum = 0, state;
 
-				selectedCells = editor.dom.select('td.mce-item-selected,th.mce-item-selected');
+				selectedCells = editor.dom.select('td[data-mce-selected],th[data-mce-selected]');
 				selectedElm = selectedCells[0];
 				if (!selectedElm) {
 					selectedElm = editor.selection.getStart();
@@ -333,7 +345,11 @@ define("tinymce/tableplugin/Plugin", [
 		self.quirks = new Quirks(editor);
 
 		editor.on('Init', function() {
-			self.cellSelection = new CellSelection(editor);
+			self.cellSelection = new CellSelection(editor, function (selecting) {
+				if (selecting) {
+					resizeBars.clearBars();
+				}
+			});
 			self.resizeBars = resizeBars;
 		});
 
@@ -362,7 +378,7 @@ define("tinymce/tableplugin/Plugin", [
 
 				cell = editor.dom.getParent(editor.selection.getStart(), 'th,td');
 
-				if (!editor.dom.select('td.mce-item-selected,th.mce-item-selected').length) {
+				if (!editor.dom.select('td[data-mce-selected],th[data-mce-selected]').length) {
 					dialogs.merge(grid, cell);
 				} else {
 					grid.merge();
@@ -551,6 +567,14 @@ define("tinymce/tableplugin/Plugin", [
 			);
 		}
 
+		function getClipboardRows() {
+			return clipboardRows;
+		}
+
+		function setClipboardRows(rows) {
+			clipboardRows = rows;
+		}
+
 		addButtons();
 		addToolbars();
 
@@ -581,6 +605,8 @@ define("tinymce/tableplugin/Plugin", [
 		}
 
 		self.insertTable = insertTable;
+		self.setClipboardRows = setClipboardRows;
+		self.getClipboardRows = getClipboardRows;
 	}
 
 	PluginManager.add('table', Plugin);

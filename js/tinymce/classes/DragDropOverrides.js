@@ -101,6 +101,7 @@ define("tinymce/DragDropOverrides", [
 			}
 
 			if (state.dragging) {
+				editor._selectionOverrides.hideFakeCaret();
 				editor.selection.placeCaretAt(e.clientX, e.clientY);
 
 				clientX = state.clientX + deltaX - state.relX;
@@ -129,14 +130,31 @@ define("tinymce/DragDropOverrides", [
 			}
 		}
 
-		function drop() {
+		function drop(evt) {
+			var dropEvt;
+
 			if (state.dragging) {
 				// Hack for IE since it doesn't sync W3C Range with IE Specific range
 				editor.selection.setRng(editor.selection.getSel().getRangeAt(0));
 
 				if (isValidDropTarget(editor.selection.getNode())) {
+					var targetClone = state.element;
+
+					// Pass along clientX, clientY if we have them
+					dropEvt = editor.fire('drop', {
+						targetClone: targetClone,
+						clientX: evt.clientX,
+						clientY: evt.clientY
+					});
+
+					if (dropEvt.isDefaultPrevented()) {
+						return;
+					}
+
+					targetClone = dropEvt.targetClone;
+
 					editor.undoManager.transact(function() {
-						editor.insertContent(dom.getOuterHTML(state.element));
+						editor.insertContent(dom.getOuterHTML(targetClone));
 						$(state.element).remove();
 					});
 				}
@@ -146,14 +164,19 @@ define("tinymce/DragDropOverrides", [
 		}
 
 		function start(e) {
-			var ceElm;
+			var ceElm, evt;
 
 			stop();
+
+			if (e.button !== 0) {
+				return;
+			}
 
 			ceElm = Arr.find(editor.dom.getParents(e.target), Fun.or(isContentEditableFalse, isContentEditableTrue));
 
 			if (isDraggable(ceElm)) {
-				if (editor.fire('dragstart', {target: ceElm}).isDefaultPrevented()) {
+				evt = editor.fire('dragstart', {target: ceElm});
+				if (evt.isDefaultPrevented()) {
 					return;
 				}
 
@@ -194,7 +217,8 @@ define("tinymce/DragDropOverrides", [
 
 		// Blocks drop inside cE=false on IE
 		editor.on('drop', function(e) {
-			var realTarget = editor.getDoc().elementFromPoint(e.clientX, e.clientY);
+			// FF doesn't pass out clientX/clientY for drop since this is for IE we just use null instead
+			var realTarget = typeof e.clientX !== 'undefined' ? editor.getDoc().elementFromPoint(e.clientX, e.clientY) : null;
 
 			if (isContentEditableFalse(realTarget) || isContentEditableFalse(editor.dom.getContentEditableParent(realTarget))) {
 				e.preventDefault();
